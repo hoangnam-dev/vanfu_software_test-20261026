@@ -1,0 +1,64 @@
+services:
+  php:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    volumes:
+      - ./app:/var/www
+      - ./php/php.ini:/usr/local/etc/php/php.ini
+      - ./php/log:/var/log/php
+    depends_on:
+      - db
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ./app:/var/www
+      - ./docker/nginx:/etc/nginx/conf.d
+    depends_on:
+      - php
+
+  db:
+    image: mysql:8.0
+    command: --default-authentication-plugin=mysql_native_password
+    environment:
+      MYSQL_ROOT_PASSWORD: pw
+      MYSQL_DATABASE: pg-skill_db
+    ports:
+      - "3307:3306"
+    volumes:
+      - dbdata:/var/lib/mysql
+      - ./db/initdb.d:/docker-entrypoint-initdb.d
+    restart: always
+
+  react:
+    image: node:20
+    working_dir: /app
+    volumes:
+      - ./app/frontend-react:/app
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+      - WATCHPACK_POLLING=true
+      - FAST_REFRESH=false
+    stdin_open: true
+    tty: true
+    command: sh -c "npm install && HOST=0.0.0.0 npm start"
+    ports:
+      - "3000:3000"
+
+  phpmyadmin:
+    container_name: phpmyadmin
+    image: phpmyadmin/phpmyadmin
+    links:
+      - db:db
+    ports:
+      - "82:80"
+    environment:
+      MYSQL_USER: db
+      MYSQL_PASSWORD: pw
+      MYSQL_ROOT_PASSWORD: pw
+
+volumes:
+  dbdata:
